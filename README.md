@@ -1,6 +1,6 @@
 # SynthFix
 
-**Adaptive neural-symbolic code vulnerability repair for code LLMs.**
+**Adaptive neuro-symbolic code vulnerability repair for code LLMs.**
 
 SynthFix is a PyTorch / Hugging Face training library that adds an
 adaptive curriculum on top of standard supervised fine-tuning for
@@ -282,7 +282,7 @@ If you use this code in your research, please cite:
 
 ```bibtex
 @inproceedings{synthfix2026,
-  title     = {SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair},
+  title     = {SynthFix: Adaptive Neuro-Symbolic Code Vulnerability Repair},
   author    = {SynthFix Authors},
   booktitle = {Findings of the Association for Computational Linguistics: ACL 2026},
   year      = {2026},
