@@ -276,6 +276,19 @@ Issues and pull requests are welcome. If you find a bug, please open
 an issue with a minimal reproduction. For larger changes, opening an
 issue first to discuss the direction is appreciated.
 
+## Citation
+
+If you use this code in your research, please cite:
+
+```bibtex
+@inproceedings{synthfix2026,
+  title     = {SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair},
+  author    = {SynthFix Authors},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2026},
+  year      = {2026},
+}
+```
+
 ## License
 
 Released under the terms of the [LICENSE](LICENSE) file.

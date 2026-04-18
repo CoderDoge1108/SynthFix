@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite the ACL 2026 Findings paper below."
 title: "SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair"
 abstract: >
   SynthFix is a training library that combines supervised fine-tuning
@@ -10,7 +10,15 @@ abstract: >
   best-of-K reranker.
 authors:
   - family-names: "SynthFix"
-    given-names: "Contributors"
+    given-names: "Authors"
 version: "0.1.0"
 date-released: 2026-04-18
 license: "See LICENSE"
+preferred-citation:
+  type: conference-paper
+  title: "SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair"
+  authors:
+    - family-names: "SynthFix"
+      given-names: "Authors"
+  collection-title: "Findings of the Association for Computational Linguistics: ACL 2026"
+  year: 2026
