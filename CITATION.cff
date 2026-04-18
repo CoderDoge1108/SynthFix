@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software or its accompanying paper, please cite it as below."
+title: "SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair"
+abstract: >
+  SynthFix is a hybrid training framework for LLM-based code
+  vulnerability repair. It combines Supervised Fine-Tuning (SFT)
+  with Reward Fine-Tuning (RFT) through a lightweight neural router
+  that adaptively gates the symbolic reward signal based on
+  per-sample difficulty features. The symbolic reward is split into
+  AST, CFG, semantic, and surface-similarity components, yielding a
+  richer training signal than a single scalar reward.
+authors:
+  - family-names: "Anonymous"
+    given-names: "Authors"
+version: "0.1.0-preview"
+date-released: 2026-04-18
+license: "See LICENSE"

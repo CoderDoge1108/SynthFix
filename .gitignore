@@ -1,0 +1,24 @@
+results/
+__pycache__/
+*.pyc
+*.pt
+*.bin
+*.safetensors
+*.log
+.DS_Store
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+venv/
+wandb/
+.ipynb_checkpoints/
+.idea/
+.vscode/
+
+# Local data artifacts
+data/*/train.json
+data/*/val.json
+data/*/test.json
+data/raw_benchmarks/
