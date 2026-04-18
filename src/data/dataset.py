@@ -1,11 +1,10 @@
 """
 SynthFix: Dataset Utilities
 
-PyTorch Dataset and DataLoader for vulnerability repair with buggy/fixed code pairs.
-
-Paper Reference: Section 4 — Experimental Design
-                 Datasets: FixJS (JavaScript, ~300k), CodeFlaws (C, ~4k)
-                 Split: 80/10/10 with seed=13
+PyTorch Dataset and DataLoader for code repair with buggy/fixed code
+pairs. Supports FixJS (JavaScript), CodeFlaws (C), SVEN (Python) and
+any dataset that can be expressed in the unified JSON schema. Splits
+are 80/10/10 produced with seed=13 by `process_benchmarks.py`.
 """
 
 import json

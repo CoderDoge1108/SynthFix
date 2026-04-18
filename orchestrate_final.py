@@ -123,7 +123,7 @@ def _build_cmd(job):
     ds, seed, tag = job['dataset'], job['seed'], job['tag']
     out = RESULTS / f'{tag}.json'
     cmd = [
-        sys.executable, '-u', str(ROOT / 'artifact/run_all_experiments.py'),
+        sys.executable, '-u', str(HERE / 'run_all_experiments.py'),
         '--worker', '--method', 'synthfix', '--gpu', '0',
         '--data_dir', DATA[ds],
         '--out', str(out),

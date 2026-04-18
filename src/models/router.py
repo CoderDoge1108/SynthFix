@@ -1,12 +1,13 @@
 """
 SynthFix: Router Model
 
-Lightweight MLP that selects SFT or RFT per-sample based on code features.
-Trained with REINFORCE policy gradient.
+Lightweight MLP that predicts, per sample, whether a training example
+is "hard" (above-median loss). The output gates the RL contribution
+during router-gated RFT in `train_synthfix.py`.
 
-Paper Section 3.2 — Adaptive Training with a Router Model
 Features: [f_AST, f_CFG, f_len, f_loss] where f_loss is the model's
-current per-sample loss (dynamic signal for adaptive curriculum).
+current per-sample loss — a dynamic signal that lets the router adapt
+as training progresses.
 """
 
 import torch
@@ -16,8 +17,8 @@ import torch.nn.functional as F
 
 class RouterModel(nn.Module):
     """
-    Architecture (Paper Section 3.2, extended with loss feature):
-        [f_AST, f_CFG, f_len, f_loss]  ->  64-ReLU  ->  64-ReLU  ->  sigmoid  ->  P(RFT)
+    Architecture:
+        [f_AST, f_CFG, f_len, f_loss]  ->  64-ReLU  ->  64-ReLU  ->  sigmoid  ->  P(hard)
     """
 
     def __init__(self, input_size: int = 4, hidden_size: int = 64):
@@ -36,7 +37,7 @@ def compute_batch_features(code_texts: list,
                            sample_indices: list = None,
                            loss_history: dict = None) -> torch.Tensor:
     """
-    Extract features for router (Paper Section 3.2):
+    Extract per-sample features for the router:
         f_B = [f_AST(B), f_CFG(B), f_len(B), f_loss(B)]
 
     f_loss is each sample's most recent training loss (0.0 if unavailable).
@@ -56,10 +57,7 @@ def compute_batch_features(code_texts: list,
 
 
 def normalize_features(features: torch.Tensor) -> torch.Tensor:
-    """
-    Normalize features f_B -> f_tilde_B (Algorithm 1, line 2).
-    Min-max normalization to [0, 1] per batch.
-    """
+    """Min-max normalize features to [0, 1] per batch."""
     mn = features.min(dim=0, keepdim=True)[0]
     mx = features.max(dim=0, keepdim=True)[0]
     return (features - mn) / (mx - mn + 1e-8)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SynthFix reproducibility entry point.
+# SynthFix pipeline entry point.
 #
 # Runs the final SynthFix pipeline end-to-end:
 #   1. Orchestrate all (model, dataset) pairs via orchestrate_final.py

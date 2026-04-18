@@ -1,11 +1,10 @@
 """
 SynthFix — Router-gated REINFORCE with split-symbolic reward
 
-Training-time pipeline (paired with inference-time best-of-K rerank in
-run_all_experiments.py).  The paper's core claim is an *adaptive*
-neural-symbolic repair where a small router network decides, per
-sample, how much weight the symbolic reward signal should carry at
-training time.  This module realizes that literally:
+Training-time pipeline (paired with the inference-time best-of-K
+reranker in run_all_experiments.py).  A small router network decides,
+per sample, how much weight the symbolic reward signal should carry
+at training time:
 
   Epoch 1           Pure SFT warmup.  Gives the policy a sane starting
                     distribution (random generations would make the RL
@@ -31,11 +30,11 @@ training time.  This module realizes that literally:
 
 Selection: best val_loss, same as SFT / RFT baselines.
 
-Why this beats plain RFT:
-  * Unfiltered RFT spends reward signal on easy samples that SFT
-    already nails — pure variance.  Router gating focuses the noisy
-    signal on hard samples, where it actually helps.
-  * Split-symbolic reward gives a richer, less noisy training signal
+Design notes:
+  * Unfiltered RFT spends the reward signal on easy samples that SFT
+    already nails, which is pure variance.  Router gating focuses the
+    noisy signal on hard samples, where it is most useful.
+  * The split-symbolic reward is a richer, less noisy training signal
     than a single scalar (SIM alone can dominate if target ≈ buggy).
 """
 

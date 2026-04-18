@@ -1,9 +1,14 @@
 """
 SynthFix: Symbolic Reward Model
 
-Composite reward: r(y) = λ_AST * r_AST + λ_CFG * r_CFG + λ_Sem * r_Sem + λ_SIM * r_SIM
+Composite reward:
+    r(y) = λ_AST·r_AST + λ_CFG·r_CFG + λ_Sem·r_Sem + λ_SIM·r_SIM
 
-Paper Section 3.1 — Symbolic Reward Model for Patch Evaluation
+Each component is in [0, 1]:
+    r_AST  structural syntactic correctness (bracket balance)
+    r_CFG  control-flow fidelity vs. reference (LCS on keywords)
+    r_Sem  security heuristic (vulnerability pattern penalty)
+    r_SIM  surface similarity (chrF) vs. reference
 """
 
 import re
@@ -133,11 +138,7 @@ def compute_reward(generated: str, target: str,
                    lambda_cfg: float = 0.3,
                    lambda_sem: float = 0.1,
                    lambda_sim: float = 0.4) -> float:
-    """
-    Composite symbolic reward (Eq. 1 from paper).
-
-    Returns a scalar in [0, 1].
-    """
+    """Composite symbolic reward. Returns a scalar in [0, 1]."""
     r_ast = _try_parse_ast(generated)
     r_cfg = _cfg_similarity(generated, target)
     r_sem = _semgrep_heuristic(generated)

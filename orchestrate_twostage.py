@@ -63,7 +63,7 @@ def find_our_jobs():
 def build_cmd(tag, method, ds, epochs, gpu):
     out = RESULTS / f'{tag}.json'
     cmd = [
-        'python', str(ROOT / 'artifact/run_all_experiments.py'),
+        'python', str(HERE / 'run_all_experiments.py'),
         '--worker', '--method', method, '--gpu', '0',
         '--data_dir', DATA[ds],
         '--out', str(out),

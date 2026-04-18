@@ -1,20 +1,29 @@
-# SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair
+# SynthFix
 
-Reference implementation of **SynthFix**, a hybrid training framework
-for LLM-based code vulnerability repair. SynthFix combines
-Supervised Fine-Tuning (SFT) with a Reward Fine-Tuning (RFT) signal
-through a **lightweight neural router** that decides, per sample, how
-strongly the symbolic reward should guide training. The router
-implements an adaptive curriculum: model capacity is focused on
-harder repair patterns while easy samples are learned through plain
-SFT.
+**Adaptive neural-symbolic code vulnerability repair for code LLMs.**
 
-This repository is published as a **method-focused artifact**: the goal
-is to make the approach easy to read, adapt, and build on. It is not
-a drop-in replication package — the training recipe depends on model
-checkpoints, dataset versions, and GPU configurations that vary across
-sites, so we deliberately do not ship numerical claims, trained
-checkpoints, or benchmark snapshots.
+SynthFix is a PyTorch / Hugging Face training library that adds an
+adaptive curriculum on top of standard supervised fine-tuning for
+code-repair models. A small neural **router** inspects each training
+example's difficulty features and decides, per sample, how strongly a
+**symbolic reward** signal should shape the gradient. Easy samples are
+learned with plain cross-entropy; harder samples additionally receive
+a variance-reduced REINFORCE update driven by a composite symbolic
+reward that scores generations along syntactic, control-flow,
+security, and surface-similarity dimensions.
+
+The library ships with:
+
+- A drop-in training loop (`src/train_synthfix.py`) that works with
+  any decoder-only LM exposed through `AutoModelForCausalLM`.
+- SFT and RFT baseline trainers that share the same data loader.
+- A split symbolic reward that doubles as a feature extractor for an
+  inference-time best-of-K reranker.
+- A data-processing utility for three common code-repair benchmarks
+  (FixJS, CodeFlaws, SVEN) plus a unified JSON schema you can emit
+  from your own data.
+- Orchestrators that run the full training matrix end-to-end and
+  aggregate per-run JSONs into a single report.
 
 ---
 
@@ -76,7 +85,7 @@ beat their leave-one-out baseline.
 - **Why gate RFT?** Unfiltered RFT spends its noisy reward signal on
   easy samples that SFT already handles, adding variance without
   improving the policy. Gating concentrates the reward on the hard
-  tail, where it measurably helps.
+  tail, where it helps most.
 - **Why split the reward?** Collapsing the reward to a single scalar
   makes it easy for a single component (typically chrF) to dominate.
   Exposing the four components separately gives a richer training
@@ -90,6 +99,140 @@ beat their leave-one-out baseline.
   close to the teacher distribution and prevents the collapse modes
   that pure policy-gradient fine-tuning is prone to on small
   repair datasets.
+
+---
+
+## Installation
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Python 3.9+ and a CUDA-capable GPU are recommended. LoRA fine-tuning
+works comfortably on a single 24 GB card for 7B models and on a
+single 12 GB card for 1.3B / 3B configurations.
+
+---
+
+## Data
+
+`src/data/process_benchmarks.py` converts three common code-repair
+benchmarks into a unified JSON format:
+
+- **FixJS** (JavaScript) —
+  `fixjs/input/{50, 50-100, 100+}/{before, after}_tokenized.txt`
+- **CodeFlaws** (C) —
+  `codeflaws/<id>-bug-<bugID>-<fixID>/*.c`
+- **SVEN** (Python) —
+  `sven/data_train_val/{train, val}/cwe-*.jsonl`
+
+Each processed dataset is written as `{train,val,test}.json`, where
+every record has the shape
+`{"buggy": str, "fixed": str, "language": str}`. An 80/10/10 split is
+produced with `seed=13`.
+
+Point the orchestrator at your raw data via the `SYNTHFIX_DATA`
+environment variable (parent directory containing `fixjs/`,
+`codeflaws/`, and `sven/`) or by editing the `RAW_DATA` default in
+`run_all_experiments.py`. Benchmark data is not bundled with this
+repository; obtain it from the upstream sources.
+
+### Using your own data
+
+The loader in `src/data/dataset.py` consumes the unified JSON schema
+directly. Any dataset whose records can be expressed as
+`{"buggy": str, "fixed": str, "language": str}` will work without
+touching the training code — just emit `train.json`, `val.json`, and
+`test.json` in a directory and pass that directory as `--dataset`.
+
+---
+
+## Usage
+
+### Train on a single (model, dataset) pair
+
+```bash
+python -m src.train_synthfix \
+    --model deepseek-1.3b \
+    --dataset data/processed/fixjs \
+    --output runs/synthfix_deepseek-1.3b_fixjs \
+    --epochs 4 --batch_size 16 --lr 2e-4
+```
+
+### Train an SFT or RFT baseline
+
+```bash
+python -m src.train_baseline \
+    --method sft \
+    --model deepseek-1.3b \
+    --dataset data/processed/fixjs \
+    --output runs/sft_deepseek-1.3b_fixjs
+```
+
+### Two-stage training (warm-start SynthFix from a trained SFT checkpoint)
+
+```bash
+python orchestrate_twostage.py
+```
+
+### Full matrix driver
+
+```bash
+python run_all_experiments.py --seed 42
+```
+
+### End-to-end pipeline
+
+```bash
+bash run_final_pipeline.sh
+```
+
+Per-run JSONs emitted by the orchestrators can be rolled up into a
+single report with `aggregate_final.py`.
+
+---
+
+## Models
+
+The training code is written against `AutoModelForCausalLM`, so any
+decoder-only code LM can be dropped in by extending the `MODEL_PATHS`
+registry in `src/train_synthfix.py`. The registry shipped here covers
+a representative range of open-source code models:
+
+| Model          |  Size | Hugging Face ID                         |
+|----------------|------:|------------------------------------------|
+| DeepSeek-Coder |  1.3B | `deepseek-ai/deepseek-coder-1.3b-base`   |
+| StarCoder2     |    3B | `bigcode/starcoder2-3b`                  |
+| CodeLlama      |    7B | `codellama/CodeLlama-7b-hf`              |
+| DeepSeek-Coder |  6.7B | `deepseek-ai/deepseek-coder-6.7b-base`   |
+| StarCoder2     |    7B | `bigcode/starcoder2-7b`                  |
+
+Parameter-efficient fine-tuning uses LoRA (rank = 16, alpha = 32,
+dropout = 0.05) on `{q, k, v, o}_proj` by default.
+
+---
+
+## Extending the framework
+
+Common extensions and where to make them:
+
+- **New reward components.** Add a scoring function to
+  `src/models/symbolic.py`, include its output in
+  `compute_reward_split`, and mix it into
+  `compute_reward_from_split` with a new weight. The inference
+  reranker picks up the component automatically.
+- **Different router features.** `compute_batch_features` in
+  `src/models/router.py` is the single place to extend the feature
+  vector; also update the `input_size` passed to `RouterModel(...)`.
+- **Different gating policy.** The hard-sample gate is a single
+  expression in `src/train_synthfix.py`
+  (`hard_gate = (prob_hard >= 0.5).float()`). Swap in a soft gate
+  (`hard_gate = prob_hard`) or a temperature-scaled variant without
+  touching anything else.
+- **New benchmark.** Add a `process_<name>(raw_dir, output_base)`
+  function to `src/data/process_benchmarks.py` that emits the same
+  JSON schema, then point the orchestrator at the new dataset name.
 
 ---
 
@@ -127,134 +270,11 @@ SynthFix/
 
 ---
 
-## Installation
+## Contributing
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Python 3.9+ and a CUDA-capable GPU are recommended. LoRA fine-tuning
-works comfortably on a single 24 GB card for 7B models and on a
-single 12 GB card for the 1.3B / 3B configurations.
-
----
-
-## Data
-
-`src/data/process_benchmarks.py` converts three common
-vulnerability-repair benchmarks into a unified JSON format:
-
-- **FixJS** (JavaScript) —
-  `fixjs/input/{50, 50-100, 100+}/{before, after}_tokenized.txt`
-- **CodeFlaws** (C) —
-  `codeflaws/<id>-bug-<bugID>-<fixID>/*.c`
-- **SVEN** (Python) —
-  `sven/data_train_val/{train, val}/cwe-*.jsonl`
-
-Each processed dataset is written as
-`{train,val,test}.json`, where every record has the shape
-`{"buggy": str, "fixed": str, "language": str}`. An 80/10/10 split
-is produced with `seed=13`.
-
-Point the orchestrator at your raw data via `SYNTHFIX_DATA` (parent
-directory containing `fixjs/`, `codeflaws/`, and `sven/`) or by
-editing the `RAW_DATA` default in `run_all_experiments.py`.
-
-The data itself is not included in this repository — use the
-upstream sources for FixJS, CodeFlaws, and SVEN.
-
----
-
-## Using the method
-
-### Single (model, dataset) training run
-
-```bash
-python -m src.train_synthfix \
-    --model deepseek-1.3b \
-    --dataset data/processed/fixjs \
-    --output results/synthfix_deepseek-1.3b_fixjs \
-    --epochs 4 --batch_size 16 --lr 2e-4
-```
-
-### Baselines (SFT or RFT)
-
-```bash
-python -m src.train_baseline \
-    --method sft \
-    --model deepseek-1.3b \
-    --dataset data/processed/fixjs \
-    --output results/sft_deepseek-1.3b_fixjs
-```
-
-### Two-stage SynthFix (warm-start from a pretrained SFT checkpoint)
-
-```bash
-python orchestrate_twostage.py
-```
-
-### Full matrix driver
-
-```bash
-python run_all_experiments.py --seed 42
-```
-
-### End-to-end pipeline
-
-```bash
-bash run_final_pipeline.sh
-```
-
----
-
-## Models
-
-The training code is written against the standard Hugging Face
-`AutoModelForCausalLM` interface, so any decoder-only code LM can be
-dropped in by extending the `MODEL_PATHS` registry in
-`src/train_synthfix.py`. The registry shipped here targets a
-representative range of open-source code LMs:
-
-| Model          |  Size | Hugging Face ID                         |
-|----------------|------:|------------------------------------------|
-| DeepSeek-Coder |  1.3B | `deepseek-ai/deepseek-coder-1.3b-base`   |
-| StarCoder2     |    3B | `bigcode/starcoder2-3b`                  |
-| CodeLlama      |    7B | `codellama/CodeLlama-7b-hf`              |
-| DeepSeek-Coder |  6.7B | `deepseek-ai/deepseek-coder-6.7b-base`   |
-| StarCoder2     |    7B | `bigcode/starcoder2-7b`                  |
-
-Parameter-efficient fine-tuning is done with LoRA (rank = 16,
-alpha = 32, dropout = 0.05) on `{q, k, v, o}_proj` by default.
-
----
-
-## Extending the framework
-
-Common extensions and where to make them:
-
-- **New reward components.** Add a scoring function to
-  `src/models/symbolic.py`, include its output in
-  `compute_reward_split`, and mix it into
-  `compute_reward_from_split` with a new weight. The inference
-  reranker picks up the component automatically.
-- **Different router features.** `compute_batch_features` in
-  `src/models/router.py` is the single place to extend the feature
-  vector; also update the `input_size` passed to `RouterModel(...)`.
-- **Different gating policy.** The hard-sample gate is a single
-  expression in `src/train_synthfix.py`
-  (`hard_gate = (prob_hard >= 0.5).float()`). Swap in a soft gate
-  (`hard_gate = prob_hard`) or a temperature-scaled variant without
-  touching anything else.
-- **New benchmark.** Add a `process_<name>(raw_dir, output_base)`
-  function to `src/data/process_benchmarks.py` that emits the same
-  JSON schema, then point the orchestrator at the new dataset name.
-
----
-
-## Citation
-
-A BibTeX entry will be added with the paper.
+Issues and pull requests are welcome. If you find a bug, please open
+an issue with a minimal reproduction. For larger changes, opening an
+issue first to discuss the direction is appreciated.
 
 ## License
 

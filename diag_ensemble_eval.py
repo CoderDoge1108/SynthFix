@@ -9,7 +9,7 @@ For each test sample:
   - Pick the best per test sample. Safety rule: fall back to SFT_greedy
     when the reranker's best is not clearly better by `safety_thresh`.
 
-This is the clean inference-time ensemble proposed in the paper:
+Intuition:
   the SFT adapter is a strong prior; the SynthFix adapter produces
   diverse, reward-aware hypotheses; the reranker arbitrates.
 
@@ -18,7 +18,7 @@ Usage:
       --sft_ckpt results/sft_foundation/fixjs \
       --synthfix_ckpt results/synthfix_fixjs/final_model \
       --data data/processed/fixjs \
-      --out artifact/results/twostage/synthfix_fixjs_ensemble.json \
+      --out results/synthfix_fixjs_ensemble.json \
       --gpu 0
 """
 import argparse
