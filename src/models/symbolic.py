@@ -1,5 +1,5 @@
 """
-SynthFix v10: Split symbolic feature extraction.
+SynthFix: split symbolic feature extraction.
 
 This module is the shared symbolic layer used at both training time
 (per-token loss weighting) and inference time (per-candidate reranking).

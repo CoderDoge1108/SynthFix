@@ -44,9 +44,7 @@ from data.dataset import create_dataloaders
 from models.reward import compute_reward
 from train_synthfix import (
     MODEL_PATHS,
-    _MODEL_SIZE_CATEGORY,
     _compute_codebleu,
-    _compute_crystalbleu,
     _detect_language,
     _log,
     evaluate,

@@ -1,132 +1,206 @@
 # SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair
 
-> **Status — preview artifact.** This repository accompanies the paper
-> *"SynthFix: Adaptive Neural-Symbolic Code Vulnerability Repair."*
-> The full experiment suite is still running at the time of this release,
-> so **numerical results and trained model checkpoints are deliberately
-> omitted and marked as TBD** in the tables below. The complete method,
-> training code, evaluation pipeline, and reproducibility scripts are all
-> included so reviewers can re-run the pipeline end-to-end. We will push
-> the final tables and release the checkpoints in a tagged update before
-> the camera-ready deadline.
+Reference implementation of **SynthFix**, a hybrid training framework
+for LLM-based code vulnerability repair. SynthFix combines
+Supervised Fine-Tuning (SFT) with a Reward Fine-Tuning (RFT) signal
+through a **lightweight neural router** that decides, per sample, how
+strongly the symbolic reward should guide training. The router
+implements an adaptive curriculum: model capacity is focused on
+harder repair patterns while easy samples are learned through plain
+SFT.
 
-SynthFix is a hybrid training framework for LLM-based code vulnerability
-repair. It combines Supervised Fine-Tuning (SFT) with a Reward
-Fine-Tuning (RFT) signal through a **lightweight neural router** that
-decides, per sample, how strongly the symbolic reward should guide
-training. The router implements an adaptive curriculum: model capacity
-is focused on harder repair patterns while easy samples are learned via
-plain SFT.
+This repository is published as a **method-focused artifact**: the goal
+is to make the approach easy to read, adapt, and build on. It is not
+a drop-in replication package — the training recipe depends on model
+checkpoints, dataset versions, and GPU configurations that vary across
+sites, so we deliberately do not ship numerical claims, trained
+checkpoints, or benchmark snapshots.
 
 ---
 
-## 1. Method
+## Method
 
 The training pipeline has three phases:
 
-| Phase | Description |
-|-------|-------------|
-| 1. SFT warmup (Epoch 1) | Pure cross-entropy fine-tuning on `(buggy → fixed)` pairs. Per-sample loss is recorded as a difficulty signal. |
-| 2. Router pre-training | A 2-layer MLP router is supervised to predict "above-median loss" from four features: AST complexity, CFG depth, code length, and current per-sample loss. |
-| 3. Router-gated RFT (Epochs 2..E) | For each batch: (a) compute SFT anchor loss, (b) draw `K=2` on-policy samples (RLOO baseline), (c) score each with a split symbolic reward `r = λ_AST·r_AST + λ_CFG·r_CFG + λ_Sem·r_Sem + λ_SIM·r_SIM`, (d) gate the RL contribution by the router's "hard-sample" probability, (e) combine as `L = L_SFT + β · gate · A_LOO · CE_sampled`. |
+| Phase | What happens |
+|-------|--------------|
+| 1. SFT warmup | Standard cross-entropy fine-tuning on `(buggy → fixed)` pairs. Per-sample loss is recorded as a difficulty signal. |
+| 2. Router pre-training | A 2-layer MLP router is supervised to predict "above-median loss" from four features: AST complexity, CFG depth, code length, and the current per-sample loss. |
+| 3. Router-gated RFT | For each batch: (a) compute the SFT anchor loss, (b) draw `K` on-policy continuations (RLOO baseline), (c) score each with a split symbolic reward, (d) gate the RL contribution by the router's probability that a sample is "hard", (e) combine as `L = L_SFT + β · gate · A_LOO · CE_sampled`. |
 
-**Split symbolic reward** (in `src/models/symbolic.py`). Every generated
-continuation is scored on four dimensions in `[0,1]`:
+### Split symbolic reward
 
-* `r_AST` — syntactic correctness via bracket balance.
-* `r_CFG` — control-flow fidelity vs. reference (LCS on keyword sequences).
-* `r_Sem` — security heuristic (vulnerability pattern penalty).
-* `r_SIM` — character n-gram F-score (chrF) vs. reference fix.
+Every generated continuation is scored on four dimensions in `[0, 1]`
+(see `src/models/symbolic.py` and `src/models/reward.py`):
 
-**Router** (in `src/models/router.py`). MLP with architecture
-`[4] → 64 (ReLU) → 64 (ReLU) → 1 (sigmoid)`. Output is interpreted as
-`P(hard sample)`. Features are min-max normalized per batch.
+- `r_AST` — syntactic correctness via bracket balance.
+- `r_CFG` — control-flow fidelity versus the reference, computed as
+  normalized LCS over control-flow keyword sequences.
+- `r_Sem` — security heuristic that penalizes common vulnerability
+  patterns (`eval`, `exec`, `strcpy`, `innerHTML =`, `pickle.loads`,
+  `shell=True`, …).
+- `r_SIM` — surface similarity to the reference fix via character
+  n-gram F-score (chrF, local implementation).
 
-**Why it works.** Unfiltered RFT spends its noisy reward signal on easy
-samples that SFT already handles, adding variance without improving
-the policy. Router gating concentrates the reward on the hard tail,
-where it measurably helps. Splitting the reward into AST / CFG / SEM /
-SIM components (rather than collapsing to a single scalar) provides a
-richer training signal and is also reused as features for the
-inference-time reranker (`src/models/inference.py`).
+The composite reward is `r = λ_AST·r_AST + λ_CFG·r_CFG + λ_Sem·r_Sem +
+λ_SIM·r_SIM`, with the same components exposed as a dictionary so
+they can be reused as features for an inference-time reranker
+(`src/models/inference.py`).
 
-A formal version of the algorithm, gating analysis, and a LoRA-level
-capacity argument appear in Sections 3.1-3.3 of the paper.
+### Router
+
+Minimal MLP:
+
+```
+[f_AST, f_CFG, f_len, f_loss]  →  64 (ReLU)  →  64 (ReLU)  →  1 (σ)  →  P(hard)
+```
+
+Features are min-max normalized per batch. The router is trained in
+two stages: a short supervised pre-training step that predicts
+"above-median loss" after the SFT warmup, plus an online BCE update
+each batch in phase 3 using the current empirical median as the
+target.
+
+### Router gating
+
+During phase 3, the RL term of the loss is multiplied by
+`gate = 1[P(hard) ≥ 0.5]`. Easy samples (gate = 0) receive only the
+SFT anchor; hard samples (gate = 1) additionally receive the
+variance-reduced REINFORCE signal from RLOO. Advantages are
+normalized to unit standard deviation across the batch and clamped
+to the non-negative half-line, so updates only amplify rollouts that
+beat their leave-one-out baseline.
+
+### Design rationale
+
+- **Why gate RFT?** Unfiltered RFT spends its noisy reward signal on
+  easy samples that SFT already handles, adding variance without
+  improving the policy. Gating concentrates the reward on the hard
+  tail, where it measurably helps.
+- **Why split the reward?** Collapsing the reward to a single scalar
+  makes it easy for a single component (typically chrF) to dominate.
+  Exposing the four components separately gives a richer training
+  signal and lets the inference-time reranker score candidates
+  multi-objectively.
+- **Why RLOO with `K = 2`?** It is the minimal setting that still
+  admits an unbiased, variance-reduced REINFORCE estimator (one
+  sample acts as the baseline for the other), and it keeps the extra
+  generation cost per step bounded.
+- **Why keep an SFT anchor in phase 3?** The anchor keeps the policy
+  close to the teacher distribution and prevents the collapse modes
+  that pure policy-gradient fine-tuning is prone to on small
+  repair datasets.
 
 ---
 
-## 2. Installation
+## Repository layout
+
+```
+SynthFix/
+├── run_all_experiments.py      # Full (model × dataset × method) matrix driver
+├── orchestrate_final.py        # End-to-end SFT → SynthFix → aggregate pipeline
+├── orchestrate_twostage.py     # Two-stage (SFT warm-start) driver
+├── aggregate_final.py          # Collect per-run JSONs into a single report
+├── run_final_pipeline.sh       # One-shot pipeline entry point
+├── diag_synthfix_eval.py       # Standalone per-run diagnostics
+├── diag_ensemble_eval.py       # SFT × SynthFix ensemble diagnostics
+├── requirements.txt
+├── LICENSE
+├── configs/
+│   ├── deepspeed_zero2.json
+│   └── deepspeed_zero3.json
+├── scripts/
+│   └── run_sensitivity.sh      # Reward-weight sweep
+├── src/
+│   ├── train_synthfix.py       # Router-gated REINFORCE training loop
+│   ├── train_baseline.py       # SFT / RFT baselines (shared data path)
+│   ├── data/
+│   │   ├── dataset.py          # RepairDataset + causal-LM collate
+│   │   └── process_benchmarks.py  # Raw → unified JSON splits
+│   └── models/
+│       ├── router.py           # MLP router + feature extraction
+│       ├── reward.py           # Composite symbolic reward
+│       ├── symbolic.py         # Split symbolic features (train + inference)
+│       └── inference.py        # Best-of-K reranker
+└── data/                       # Place processed benchmark splits here
+```
+
+---
+
+## Installation
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Requirements:** Python 3.9+, CUDA-capable GPU (24 GB VRAM recommended
-for 7B models; 12 GB sufficient for the 1.3B / 3B configurations with
-LoRA).
+Python 3.9+ and a CUDA-capable GPU are recommended. LoRA fine-tuning
+works comfortably on a single 24 GB card for 7B models and on a
+single 12 GB card for the 1.3B / 3B configurations.
 
 ---
 
-## 3. Data
+## Data
 
-SynthFix is evaluated on three vulnerability-repair benchmarks:
+`src/data/process_benchmarks.py` converts three common
+vulnerability-repair benchmarks into a unified JSON format:
 
-| Dataset    | Language   | Train  | Val  | Test |
-|------------|------------|-------:|-----:|-----:|
-| FixJS      | JavaScript |  2,000 |  100 |  200 |
-| CodeFlaws  | C          | ~3,100 | ~390 | ~390 |
-| SVEN       | Python     |   ~716 |  ~42 |  ~42 |
+- **FixJS** (JavaScript) —
+  `fixjs/input/{50, 50-100, 100+}/{before, after}_tokenized.txt`
+- **CodeFlaws** (C) —
+  `codeflaws/<id>-bug-<bugID>-<fixID>/*.c`
+- **SVEN** (Python) —
+  `sven/data_train_val/{train, val}/cwe-*.jsonl`
 
-Place raw benchmark data under `../data/raw_benchmarks/` (relative to
-the repo root), **or** export `SYNTHFIX_DATA` to a directory containing
-`fixjs/`, `codeflaws/`, `sven/` subfolders. The experiment runner will
-process and split them automatically using `seed=13` (80/10/10).
+Each processed dataset is written as
+`{train,val,test}.json`, where every record has the shape
+`{"buggy": str, "fixed": str, "language": str}`. An 80/10/10 split
+is produced with `seed=13`.
 
-The expected raw layouts are documented in
-`src/data/process_benchmarks.py`:
+Point the orchestrator at your raw data via `SYNTHFIX_DATA` (parent
+directory containing `fixjs/`, `codeflaws/`, and `sven/`) or by
+editing the `RAW_DATA` default in `run_all_experiments.py`.
 
-* FixJS:     `fixjs/input/{50,50-100,100+}/{before,after}_tokenized.txt`
-* CodeFlaws: `codeflaws/<id>-bug-<bugID>-<fixID>/*.c`
-* SVEN:      `sven/data_train_val/{train,val}/cwe-*.jsonl`
+The data itself is not included in this repository — use the
+upstream sources for FixJS, CodeFlaws, and SVEN.
 
 ---
 
-## 4. Running Experiments
+## Using the method
 
-### Full suite (5 models × 3 datasets × {SFT, RFT, SynthFix})
-
-```bash
-python run_all_experiments.py --seed 42
-```
-
-Outputs under `results/` (ignored by git).
-
-### Single (model, dataset) pair
+### Single (model, dataset) training run
 
 ```bash
 python -m src.train_synthfix \
     --model deepseek-1.3b \
-    --dataset data/fixjs \
-    --output results/deepseek-1.3b_fixjs \
+    --dataset data/processed/fixjs \
+    --output results/synthfix_deepseek-1.3b_fixjs \
     --epochs 4 --batch_size 16 --lr 2e-4
 ```
 
-### Baselines (SFT or RFT only)
+### Baselines (SFT or RFT)
 
 ```bash
 python -m src.train_baseline \
-    --method sft --model deepseek-1.3b \
-    --dataset data/fixjs --output results/sft_deepseek-1.3b_fixjs
+    --method sft \
+    --model deepseek-1.3b \
+    --dataset data/processed/fixjs \
+    --output results/sft_deepseek-1.3b_fixjs
 ```
 
 ### Two-stage SynthFix (warm-start from a pretrained SFT checkpoint)
 
 ```bash
-python orchestrate_twostage.py --model deepseek-1.3b --dataset data/fixjs
+python orchestrate_twostage.py
 ```
 
-### Final reproducibility pipeline (SFT → SynthFix + aggregation)
+### Full matrix driver
+
+```bash
+python run_all_experiments.py --seed 42
+```
+
+### End-to-end pipeline
 
 ```bash
 bash run_final_pipeline.sh
@@ -134,110 +208,54 @@ bash run_final_pipeline.sh
 
 ---
 
-## 5. Models
+## Models
 
-| Model            | Size | HuggingFace ID                           |
-|------------------|-----:|------------------------------------------|
-| DeepSeek-Coder   | 1.3B | `deepseek-ai/deepseek-coder-1.3b-base`   |
-| StarCoder2       |   3B | `bigcode/starcoder2-3b`                  |
-| CodeLlama        |   7B | `codellama/CodeLlama-7b-hf`              |
-| DeepSeek-Coder   | 6.7B | `deepseek-ai/deepseek-coder-6.7b-base`   |
-| StarCoder2       |   7B | `bigcode/starcoder2-7b`                  |
+The training code is written against the standard Hugging Face
+`AutoModelForCausalLM` interface, so any decoder-only code LM can be
+dropped in by extending the `MODEL_PATHS` registry in
+`src/train_synthfix.py`. The registry shipped here targets a
+representative range of open-source code LMs:
 
-All models use LoRA (rank=16, alpha=32, dropout=0.05) on
-`{q,k,v,o}_proj` for parameter-efficient fine-tuning.
+| Model          |  Size | Hugging Face ID                         |
+|----------------|------:|------------------------------------------|
+| DeepSeek-Coder |  1.3B | `deepseek-ai/deepseek-coder-1.3b-base`   |
+| StarCoder2     |    3B | `bigcode/starcoder2-3b`                  |
+| CodeLlama      |    7B | `codellama/CodeLlama-7b-hf`              |
+| DeepSeek-Coder |  6.7B | `deepseek-ai/deepseek-coder-6.7b-base`   |
+| StarCoder2     |    7B | `bigcode/starcoder2-7b`                  |
 
----
-
-## 6. Results (to be released)
-
-> The numbers in this section are **placeholders** and will be replaced
-> with the final values in a tagged update before the camera-ready
-> deadline. Metrics reported: **CodeBLEU** (structural code similarity)
-> and **Exact Match (EM)** (fraction of predictions identical to the
-> reference fix).
-
-### 6.1 Main comparison — CodeBLEU (%)
-
-| Model           | Method    | FixJS | CodeFlaws | SVEN |
-|-----------------|-----------|------:|----------:|-----:|
-| DeepSeek-1.3B   | SFT       |   TBD |       TBD |  TBD |
-| DeepSeek-1.3B   | RFT       |   TBD |       TBD |  TBD |
-| DeepSeek-1.3B   | SynthFix  |   TBD |       TBD |  TBD |
-| StarCoder2-3B   | SFT       |   TBD |       TBD |  TBD |
-| StarCoder2-3B   | RFT       |   TBD |       TBD |  TBD |
-| StarCoder2-3B   | SynthFix  |   TBD |       TBD |  TBD |
-| CodeLlama-7B    | SFT       |   TBD |       TBD |  TBD |
-| CodeLlama-7B    | RFT       |   TBD |       TBD |  TBD |
-| CodeLlama-7B    | SynthFix  |   TBD |       TBD |  TBD |
-| DeepSeek-6.7B   | SFT       |   TBD |       TBD |  TBD |
-| DeepSeek-6.7B   | RFT       |   TBD |       TBD |  TBD |
-| DeepSeek-6.7B   | SynthFix  |   TBD |       TBD |  TBD |
-| StarCoder2-7B   | SFT       |   TBD |       TBD |  TBD |
-| StarCoder2-7B   | RFT       |   TBD |       TBD |  TBD |
-| StarCoder2-7B   | SynthFix  |   TBD |       TBD |  TBD |
-
-### 6.2 Exact Match (%)
-
-Layout identical to §6.1; values TBD.
-
-### 6.3 Ablations
-
-| Ablation                                          | FixJS | CodeFlaws | SVEN |
-|---------------------------------------------------|------:|----------:|-----:|
-| Full SynthFix                                     |   TBD |       TBD |  TBD |
-| − router gate (always-on RFT)                     |   TBD |       TBD |  TBD |
-| − split reward (single scalar)                    |   TBD |       TBD |  TBD |
-| − RLOO (single-sample baseline)                   |   TBD |       TBD |  TBD |
-| − SFT anchor                                      |   TBD |       TBD |  TBD |
-| − loss-history feature for router                 |   TBD |       TBD |  TBD |
-
-### 6.4 Reward-weight sensitivity (CodeBLEU)
-
-See `scripts/run_sensitivity.sh`. Final heatmap will be added in the
-camera-ready revision.
+Parameter-efficient fine-tuning is done with LoRA (rank = 16,
+alpha = 32, dropout = 0.05) on `{q, k, v, o}_proj` by default.
 
 ---
 
-## 7. Project Structure
+## Extending the framework
 
-```
-SynthFix/
-├── run_all_experiments.py      # Full matrix orchestrator (5 models × 3 datasets)
-├── orchestrate_final.py        # Final SFT → SynthFix → aggregate pipeline
-├── orchestrate_twostage.py     # Two-stage (SFT warm-start) driver
-├── aggregate_final.py          # Collect per-run JSONs into the final report
-├── run_final_pipeline.sh       # One-shot reproducibility entry point
-├── requirements.txt
-├── LICENSE
-├── configs/
-│   ├── deepspeed_zero2.json
-│   └── deepspeed_zero3.json
-├── scripts/
-│   └── run_sensitivity.sh      # λ_AST/λ_CFG/λ_Sem/λ_SIM sweep
-├── src/
-│   ├── train_synthfix.py       # SynthFix v11 training loop (router-gated RFT)
-│   ├── train_baseline.py       # SFT / RFT baselines (identical data loader)
-│   ├── data/
-│   │   ├── dataset.py          # RepairDataset + causal-LM collate
-│   │   └── process_benchmarks.py  # Raw → unified JSON splits
-│   └── models/
-│       ├── router.py           # MLP router + feature extraction
-│       ├── reward.py           # Composite symbolic reward (training)
-│       ├── symbolic.py         # Split symbolic features (train + inference)
-│       └── inference.py        # Best-of-K reranker using split-symbolic features
-├── tests/
-│   └── test_method_comparison.py
-└── diag_synthfix_eval.py       # Standalone per-run diagnostics
-```
+Common extensions and where to make them:
+
+- **New reward components.** Add a scoring function to
+  `src/models/symbolic.py`, include its output in
+  `compute_reward_split`, and mix it into
+  `compute_reward_from_split` with a new weight. The inference
+  reranker picks up the component automatically.
+- **Different router features.** `compute_batch_features` in
+  `src/models/router.py` is the single place to extend the feature
+  vector; also update the `input_size` passed to `RouterModel(...)`.
+- **Different gating policy.** The hard-sample gate is a single
+  expression in `src/train_synthfix.py`
+  (`hard_gate = (prob_hard >= 0.5).float()`). Swap in a soft gate
+  (`hard_gate = prob_hard`) or a temperature-scaled variant without
+  touching anything else.
+- **New benchmark.** Add a `process_<name>(raw_dir, output_base)`
+  function to `src/data/process_benchmarks.py` that emits the same
+  JSON schema, then point the orchestrator at the new dataset name.
 
 ---
 
-## 8. Citation
+## Citation
 
-A BibTeX entry will be added with the camera-ready version. Please cite
-the paper if you use this code.
+A BibTeX entry will be added with the paper.
 
-## 9. License
+## License
 
 Released under the terms of the [LICENSE](LICENSE) file.

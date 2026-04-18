@@ -1,5 +1,5 @@
 """
-SynthFix v11 — Router-gated REINFORCE with Split-Symbolic Reward
+SynthFix — Router-gated REINFORCE with split-symbolic reward
 
 Training-time pipeline (paired with inference-time best-of-K rerank in
 run_all_experiments.py).  The paper's core claim is an *adaptive*
@@ -244,25 +244,21 @@ ROUTER_PRETRAIN_STEPS = 100
 VAL_GEN_MAX_SAMPLES = 64
 VAL_GEN_MAX_NEW_TOKENS = 96
 
-# v11 config
+# Training-loop config
 SFT_WARMUP_EPOCHS = 1
 # RL loss weight.  With RLOO (k samples per prompt, leave-one-out
 # baseline) the advantage signal is much less noisy than with a
 # single-sample moving-average baseline, so a moderate BETA_RL is
 # safe and gives the reranker diverse-but-still-sharp candidates.
-# v12 (deadline run): raised from 0.15 → 0.25 now that phase-2 LR
-# is 20x lower (1e-5 vs 2e-4), which makes the RL signal much less
-# likely to cause collapse.  Module-level default; overridable via
-# args.rl_beta so old experiments reproduce exactly.
+# Module-level default; overridable per-run via args.rl_beta.
 BETA_RL = 0.25
 # Number of on-policy samples per prompt for RLOO.  k=2 is the
 # minimal setting (one sample acts as the baseline for the other)
 # and already removes most of the REINFORCE variance.
 RLOO_K = 2
-# Temperature for REINFORCE continuation sampling.  Raised 0.7 → 0.9
-# (v12) so the sampled candidates actually differ from greedy — the
-# previous 0.7 gave near-deterministic rollouts on small models,
-# which yielded tiny effective advantages.
+# Temperature for REINFORCE continuation sampling.  0.9 keeps the
+# sampled candidates meaningfully different from greedy decoding so
+# advantages stay informative on small models / small datasets.
 RL_SAMPLE_TEMP = 0.9
 RL_TOP_P = 0.95
 RL_NO_REPEAT_NGRAM = 3
@@ -359,7 +355,7 @@ def _compute_val_codebleu(model, tokenizer, val_loader, device, lang,
 
 def train_synthfix(model, tokenizer, router, train_loader, val_loader,
                    output_dir, args, device):
-    """SynthFix v10 — split-symbolic curriculum training."""
+    """SynthFix — split-symbolic curriculum training."""
     model = model.to(device)
     router = router.to(device)
 
@@ -391,8 +387,9 @@ def train_synthfix(model, tokenizer, router, train_loader, val_loader,
     # Token-type table kept around so the inference reranker (run via
     # run_all_experiments.py) can reuse it for split-symbolic features
     # on generated candidates.  Not used in the training loss anymore
-    # (v11 drops the per-token CE weighting; split-symbolic lives in
-    # the reward function and at inference time instead).
+    # (Per-token CE weighting is not used in the current training
+    # loss; split-symbolic lives in the reward function and at
+    # inference time instead.)
     _log('Building token type table (for inference reranker)...')
     token_type_table = build_token_type_table(tokenizer).to(device)
     _log(f'Token type table: total={len(token_type_table)}  '
@@ -415,7 +412,7 @@ def train_synthfix(model, tokenizer, router, train_loader, val_loader,
     warmup_epochs = min(sft_warmup, max(0, args.epochs - 1)) if sft_warmup > 0 else 0
 
     _log('=' * 70)
-    _log('SYNTHFIX v11: Router-gated REINFORCE + split-symbolic reward')
+    _log('SYNTHFIX: Router-gated REINFORCE + split-symbolic reward')
     _log(f'  Phase 1 (epoch 1..{warmup_epochs}): pure SFT warmup')
     _log(f'  Router pre-training: {ROUTER_PRETRAIN_STEPS} supervised steps')
     _log(f'  Phase 2 (epochs {warmup_epochs+1}..{args.epochs}): SFT + gated RFT')

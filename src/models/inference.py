@@ -1,5 +1,5 @@
 """
-SynthFix v10 — Inference-time best-of-K with learned reranker.
+SynthFix — inference-time best-of-K with learned reranker.
 
 Pipeline:
   1. Router predicts sample difficulty from buggy-code features.

@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Aggregate the v12 final-run JSONs into a single report.
+"""Aggregate per-run JSONs produced by the orchestrators into a single
+machine- and human-readable report.
 
 Reads:
-  artifact/results/twostage/{sft,rft}_{fixjs,sven}.json   (baselines)
-  artifact/results/final/sf_{fixjs,sven}_s{42,1337,7}.json (main)
-  artifact/results/final/abl_*.json                         (ablations)
+  $SYNTHFIX_ROOT/results/twostage/{sft,rft,synthfix}_<dataset>.json
+  $SYNTHFIX_ROOT/results/final/sf_<dataset>_s<seed>.json
+  $SYNTHFIX_ROOT/results/final/abl_*.json
 
 Emits:
-  artifact/results/final/final_report.json
-  artifact/results/final/final_report.md
+  $SYNTHFIX_ROOT/results/final/final_report.json
+  $SYNTHFIX_ROOT/results/final/final_report.md
+
+The DATASETS / SEEDS lists and the ablation tags below are the defaults
+matching the shipped orchestrators; override them by setting the
+SYNTHFIX_REPORT_DATASETS / SYNTHFIX_REPORT_SEEDS env vars (JSON arrays)
+if your run matrix differs.
 """
 
 import json
@@ -21,8 +27,10 @@ ROOT = Path(os.environ.get('SYNTHFIX_ROOT', str(HERE)))
 TWOSTAGE = ROOT / 'results' / 'twostage'
 FINAL = ROOT / 'results' / 'final'
 
-DATASETS = ['fixjs', 'sven']
-SEEDS = [42, 1337, 7]
+DATASETS = json.loads(
+    os.environ.get('SYNTHFIX_REPORT_DATASETS', '["fixjs", "sven"]'))
+SEEDS = json.loads(
+    os.environ.get('SYNTHFIX_REPORT_SEEDS', '[42, 1337, 7]'))
 
 
 def _load(p):
@@ -50,7 +58,7 @@ def _seed_stats(values):
 
 def main():
     report = {'baselines': {}, 'synthfix_new': {}, 'ablations': {}}
-    md = ['# SynthFix v12 — final results', '']
+    md = ['# SynthFix — aggregated results', '']
 
     # Baselines (reused from last two-stage run)
     for ds in DATASETS:
@@ -62,7 +70,7 @@ def main():
                                'em': sft['exact_match'] if sft else None},
             'RFT':            {'codebleu': rft['codebleu'] if rft else None,
                                'em': rft['exact_match'] if rft else None},
-            'SynthFix(old)':  {'codebleu': old_sf['codebleu'] if old_sf else None,
+            'SynthFix(ref)':  {'codebleu': old_sf['codebleu'] if old_sf else None,
                                'em': old_sf['exact_match'] if old_sf else None},
         }
 
@@ -115,16 +123,16 @@ def main():
     (FINAL / 'final_report.json').write_text(json.dumps(report, indent=2))
 
     # ── Markdown summary ───────────────────────────────────────────
-    md.append('## Main results (test CodeBLEU, deepseek-1.3b)')
+    md.append('## Main results (test CodeBLEU)')
     md.append('')
-    md.append('| Dataset | SFT | RFT | SynthFix (old) | **SynthFix (v12)** | Δ vs SFT | Δ vs old SynthFix |')
-    md.append('|--------|-----|-----|---------------|--------------------|---------|-------------------|')
+    md.append('| Dataset | SFT | RFT | SynthFix (ref) | **SynthFix** | Δ vs SFT | Δ vs SynthFix (ref) |')
+    md.append('|--------|-----|-----|---------------|--------------|---------|---------------------|')
     for ds in DATASETS:
         b = report['baselines'][ds]
         new = report['synthfix_new'][ds]
         sft_cb = b['SFT']['codebleu']
         rft_cb = b['RFT']['codebleu']
-        old_cb = b['SynthFix(old)']['codebleu']
+        old_cb = b['SynthFix(ref)']['codebleu']
         new_m = new['mean_codebleu']
         new_s = new['std_codebleu']
         new_str = (f'**{new_m*100:.2f}% ± {new_s*100:.2f}%** (n={new["n_seeds"]})'
@@ -138,8 +146,8 @@ def main():
     md.append('')
 
     md.append('## Exact Match')
-    md.append('| Dataset | SFT | RFT | SynthFix (old) | **SynthFix (v12)** |')
-    md.append('|--------|-----|-----|---------------|--------------------|')
+    md.append('| Dataset | SFT | RFT | SynthFix (ref) | **SynthFix** |')
+    md.append('|--------|-----|-----|---------------|--------------|')
     for ds in DATASETS:
         b = report['baselines'][ds]
         new = report['synthfix_new'][ds]
@@ -148,7 +156,7 @@ def main():
                    if new_m is not None else 'n/a')
         md.append(f'| {ds} | {_fmt_pct(b["SFT"]["em"])} | '
                   f'{_fmt_pct(b["RFT"]["em"])} | '
-                  f'{_fmt_pct(b["SynthFix(old)"]["em"])} | {new_str} |')
+                  f'{_fmt_pct(b["SynthFix(ref)"]["em"])} | {new_str} |')
     md.append('')
 
     def _fmt_pp(x):
@@ -157,7 +165,7 @@ def main():
     def _fmt_s(x):
         return '—' if x is None else str(int(x))
 
-    md.append('## Per-seed breakdown (SynthFix v12)')
+    md.append('## Per-seed breakdown (SynthFix)')
     md.append('| Dataset | Seed | CodeBLEU | EM | Greedy CB | Rerank Δ | Time (s) |')
     md.append('|--------|------|---------|-----|----------|----------|--------|')
     for ds in DATASETS:
@@ -173,11 +181,20 @@ def main():
                       f'{_fmt_s(ps.get("train_time_s"))} |')
     md.append('')
 
-    md.append('## Ablations (fixjs, seed 42)')
+    md.append('## Ablations')
     md.append('| Ablation | CodeBLEU | EM | Greedy CB | Rerank Δ |')
     md.append('|---------|---------|-----|----------|----------|')
-    main_ref = report['synthfix_new']['fixjs']['per_seed'].get(42) or {}
-    md.append(f'| (main) v12 | {_fmt_pct(main_ref.get("codebleu"))} | '
+    # Pick the first (dataset, seed) pair with a result as the reference.
+    main_ref = {}
+    for ds in DATASETS:
+        for s in SEEDS:
+            ps = report['synthfix_new'][ds]['per_seed'].get(s)
+            if ps:
+                main_ref = ps
+                break
+        if main_ref:
+            break
+    md.append(f'| (main) | {_fmt_pct(main_ref.get("codebleu"))} | '
               f'{_fmt_pct(main_ref.get("em"))} | '
               f'{_fmt_pct(main_ref.get("codebleu_greedy"))} | '
               f'{_fmt_pp(main_ref.get("reranker_delta_pp"))} |')

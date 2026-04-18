@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-SynthFix: Full Experiment Suite — Overnight Runner
+SynthFix: Full Experiment Suite
 
 Trains SFT / RFT / SynthFix across multiple model sizes and datasets.
-Uses both A6000 GPUs in parallel where possible.
+Runs sequentially on a single GPU by default; multi-GPU dispatch can
+be layered on top by the user.
 
-Hyperparameters matched to the proven rebuttal configuration:
+Default hyperparameters:
   - lr=2e-4, epochs=3, LoRA r=16, alpha=32
   - Per-sample routing with separate baselines
 
@@ -80,8 +81,8 @@ DATASETS = {
     },
 }
 
-# All models use rebuttal-matched config: lr=2e-4, epochs=4, LoRA r=16
-# (4 epochs: 1 SFT warmup + 3 curriculum for SynthFix; fair comparison)
+# Shared config: lr=2e-4, epochs=4, LoRA r=16
+# (4 epochs = 1 SFT warmup + 3 curriculum for SynthFix; matches baselines)
 MODELS = [
     {
         'model': 'deepseek-1.3b',
@@ -497,7 +498,7 @@ def run_worker(args):
             model = PeftModel.from_pretrained(model, best_dir)
             model = model.to(device)
 
-    # ── SynthFix (per-sample routing — matching rebuttal) ──────────
+    # ── SynthFix (per-sample routing) ───────────────────────────────
     elif method == 'synthfix':
         from train_synthfix import train_synthfix as _train_sf
 
@@ -513,7 +514,7 @@ def run_worker(args):
         _a.lambda_sem = 0.334
         _a.max_new_tokens = max_new_tokens
         _a.dataset = args.data_dir
-        # v12: forward RL knobs if CLI provided them (None → module default).
+        # Forward RL knobs if CLI provided them (None → module default).
         for _k in ('rl_beta', 'rloo_k', 'rl_temp', 'rl_top_p',
                    'rl_no_repeat_ngram'):
             _v = getattr(args, _k, None)
@@ -573,9 +574,8 @@ def run_worker(args):
     # ── Evaluate ────────────────────────────────────────────────────
     # Continuation-only eval: we decode ONLY the newly generated tokens
     # (everything after the prompt) and compare to the fixed reference.
-    # This matches the original rebuttal evaluation and avoids the
-    # prompt-echo inflation that was hiding method differences under the
-    # prior "full-output" protocol.
+    # This avoids the prompt-echo inflation that the "full-output"
+    # protocol introduces, which can hide method differences.
     #
     # SynthFix uses router-gated inference-time best-of-K with a
     # learned LightGBM reranker. The SFT/RFT baselines use plain
@@ -636,10 +636,10 @@ def run_worker(args):
                     greedy_idx = next((i for i, g in enumerate(gflags[j])
                                         if g), 0)
                     max_score = float(np.max(scores))
-                    # Configurable margin — v12 default 0.005 (down from
-                    # 0.015) now that reranker is trained with LambdaRank
-                    # on 1600 candidates and empirically picks better
-                    # when allowed to fire more aggressively.
+                    # Configurable margin: the reranker only overrides
+                    # greedy if its score for the best candidate beats
+                    # greedy's by RERANK_MARGIN. Keeps greedy as a safe
+                    # default when candidate scores are close.
                     if (max_score - scores[greedy_idx]) < RERANK_MARGIN:
                         best = greedy_idx
                     else:
@@ -927,7 +927,7 @@ def main():
 
     total_jobs = len(MODELS) * len(DATASETS)
     _log('=' * 70)
-    _log('  SynthFix: FULL EXPERIMENT SUITE (rebuttal-matched config)')
+    _log('  SynthFix: FULL EXPERIMENT SUITE')
     _log(f'  {len(MODELS)} models × {len(DATASETS)} datasets = {total_jobs} experiments')
     _log(f'  Datasets: {", ".join(DATASETS.keys())}')
     _log(f'  Models: {", ".join(m["model"] for m in MODELS)}')
@@ -1027,7 +1027,7 @@ if __name__ == '__main__':
                         help='Override SFT warmup epochs for SynthFix '
                              '(default = module default; 0 when starting '
                              'from a trained SFT ckpt).')
-    # ── v12 deadline-run knobs ──────────────────────────────────────
+    # ── Optional RL-loop overrides ──────────────────────────────────
     parser.add_argument('--rl_beta', type=float, default=None,
                         help='Override SynthFix BETA_RL (RL loss weight).')
     parser.add_argument('--rloo_k', type=int, default=None,
