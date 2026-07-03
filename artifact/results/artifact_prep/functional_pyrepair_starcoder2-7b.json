@@ -1,0 +1,18 @@
+{
+  "model": "starcoder2-7b",
+  "data": "data/benchmarks_processed/pyrepair",
+  "split": "test",
+  "K": 16,
+  "n": 115,
+  "sft_greedy_solved": 91,
+  "synthfix_bestK_solved": 107,
+  "oracle_solved": 108,
+  "sft_solved_rate": 0.7913043478260869,
+  "synthfix_solved_rate": 0.9304347826086956,
+  "oracle_solved_rate": 0.9391304347826087,
+  "codebleu": {
+    "sft_greedy": 76.67024061308884,
+    "synthfix_bestK": 76.89323682888012
+  },
+  "synthfix_vs_sft_rel_pct": 17.582417582417584
+}

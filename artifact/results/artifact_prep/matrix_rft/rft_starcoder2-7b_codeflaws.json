@@ -1,0 +1,12 @@
+{
+  "method": "RFT",
+  "model": "starcoder2-7b",
+  "dataset": "codeflaws_exec",
+  "language": "c",
+  "codebleu": 0.6213334373159649,
+  "exact_match": 0.05115089514066496,
+  "em_count": 20,
+  "total": 391,
+  "ckpt": "artifact/checkpoints/matrix/synthfix_starcoder2-7b_codeflaws/checkpoint_epoch2",
+  "note": "standalone greedy codebleu"
+}

@@ -1,0 +1,34 @@
+{
+  "method": "SynthFix-Functional",
+  "model": "llama3.2-3b",
+  "dataset": "codeflaws",
+  "n_bugs": 389,
+  "K": 16,
+  "metrics": {
+    "sft_greedy": {
+      "solved_at_1": 0.13624678663239073,
+      "mean_heldout_pass": 0.3627239156159464,
+      "solved_count": 53
+    },
+    "synthfix_greedy": {
+      "solved_at_1": 0.13624678663239073,
+      "mean_heldout_pass": 0.3627239156159464,
+      "solved_count": 53
+    },
+    "synthfix_random": {
+      "solved_at_1": 0.13881748071979436,
+      "mean_heldout_pass": 0.34370077936915994,
+      "solved_count": 54
+    },
+    "synthfix_bestofk": {
+      "solved_at_1": 0.20308483290488433,
+      "mean_heldout_pass": 0.4315328273554491,
+      "solved_count": 79
+    },
+    "synthfix_oracle": {
+      "solved_at_1": 0.2493573264781491,
+      "mean_heldout_pass": 0.4523921736646671,
+      "solved_count": 97
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "model": "deepseek-1.3b",
+  "data": "data/benchmarks_processed/pyrepair",
+  "split": "test",
+  "K": 16,
+  "n": 115,
+  "sft_greedy_solved": 79,
+  "synthfix_bestK_solved": 100,
+  "oracle_solved": 104,
+  "sft_solved_rate": 0.6869565217391305,
+  "synthfix_solved_rate": 0.8695652173913043,
+  "oracle_solved_rate": 0.9043478260869565,
+  "codebleu": {
+    "sft_greedy": 73.246390920246,
+    "synthfix_bestK": 74.25688297013345
+  },
+  "synthfix_vs_sft_rel_pct": 26.582278481012654
+}

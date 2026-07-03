@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv_qwen3/
+
+# Generated model artifacts
+artifact/checkpoints/
+artifact/work/
+artifact/generated_figures/
+
+# Large / regenerated datasets
+data/benchmarks_processed/
+data/raw_benchmarks/
+
+# Logs and temporary outputs
+*.log
+*.tmp
+*.cache
+.DS_Store

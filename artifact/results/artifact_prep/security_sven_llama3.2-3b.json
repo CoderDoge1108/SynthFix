@@ -1,0 +1,149 @@
+{
+  "model": "llama3.2-3b",
+  "data": "data/benchmarks_processed/sven",
+  "K": 16,
+  "n_test": 81,
+  "n_addressable": 16,
+  "security": {
+    "sft_greedy_cleared": 16,
+    "synthfix_bestK_cleared": 16,
+    "oracle_cleared": 16,
+    "sft_cleared_rate": 1.0,
+    "synthfix_cleared_rate": 1.0,
+    "oracle_cleared_rate": 1.0
+  },
+  "codebleu": {
+    "sft_greedy": 22.562545251766362,
+    "synthfix_bestK": 22.562545251766362
+  },
+  "rows": [
+    {
+      "gidx": 1,
+      "cwe": "CWE-089",
+      "buggy_find": 6,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 2,
+      "cwe": "CWE-089",
+      "buggy_find": 2,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 5,
+      "cwe": "CWE-089",
+      "buggy_find": 1,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 14,
+      "cwe": "CWE-089",
+      "buggy_find": 1,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 21,
+      "cwe": "CWE-089",
+      "buggy_find": 3,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 24,
+      "cwe": "CWE-089",
+      "buggy_find": 1,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 26,
+      "cwe": "CWE-089",
+      "buggy_find": 1,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 48,
+      "cwe": "CWE-089",
+      "buggy_find": 2,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 49,
+      "cwe": "CWE-089",
+      "buggy_find": 12,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 50,
+      "cwe": "CWE-089",
+      "buggy_find": 2,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 59,
+      "cwe": "CWE-089",
+      "buggy_find": 2,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 61,
+      "cwe": "CWE-089",
+      "buggy_find": 4,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 62,
+      "cwe": "CWE-089",
+      "buggy_find": 8,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 63,
+      "cwe": "CWE-089",
+      "buggy_find": 3,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 67,
+      "cwe": "CWE-089",
+      "buggy_find": 2,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    },
+    {
+      "gidx": 74,
+      "cwe": "CWE-089",
+      "buggy_find": 1,
+      "sft_find": 0,
+      "synthfix_find": 0,
+      "oracle_find": 0
+    }
+  ]
+}

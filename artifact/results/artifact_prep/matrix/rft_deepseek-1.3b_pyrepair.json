@@ -1,0 +1,33 @@
+{
+  "method": "RFT",
+  "model": "deepseek-1.3b",
+  "dataset": "pyrepair",
+  "language": "python",
+  "exact_match": 0.02608695652173913,
+  "codebleu": 0.7196135368462092,
+  "total": 115,
+  "em_count": 3,
+  "train_time_s": 185.3919563293457,
+  "gpu": 0,
+  "peak_gpu_mb": 32333.768192,
+  "config": {
+    "batch_size": 16,
+    "epochs": 2,
+    "lora_rank": 16,
+    "lr": 0.0002,
+    "max_new_tokens": 256,
+    "grad_checkpoint": false,
+    "seed": 42,
+    "init_from_ckpt": null,
+    "rl_beta": null,
+    "rloo_k": null,
+    "rl_temp": null,
+    "rl_top_p": null,
+    "rl_no_repeat_ngram": null,
+    "rerank_margin": 0.015,
+    "num_rerank_cands": 16,
+    "no_rerank": false,
+    "rft_rl_temp": 0.8,
+    "rft_no_repeat_ngram": 0
+  }
+}

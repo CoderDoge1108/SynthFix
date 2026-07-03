@@ -1,0 +1,18 @@
+{
+  "model": "qwen3-4b",
+  "data": "data/benchmarks_processed/pyrepair",
+  "split": "test",
+  "K": 16,
+  "n": 115,
+  "sft_greedy_solved": 93,
+  "synthfix_bestK_solved": 105,
+  "oracle_solved": 107,
+  "sft_solved_rate": 0.808695652173913,
+  "synthfix_solved_rate": 0.9130434782608695,
+  "oracle_solved_rate": 0.9304347826086956,
+  "codebleu": {
+    "sft_greedy": 80.14228660244994,
+    "synthfix_bestK": 79.7647637429629
+  },
+  "synthfix_vs_sft_rel_pct": 12.903225806451612
+}

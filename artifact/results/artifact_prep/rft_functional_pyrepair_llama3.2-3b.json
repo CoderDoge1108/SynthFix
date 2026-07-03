@@ -1,0 +1,18 @@
+{
+  "model": "llama3.2-3b",
+  "data": "data/benchmarks_processed/pyrepair",
+  "split": "test",
+  "K": 16,
+  "n": 115,
+  "sft_greedy_solved": 85,
+  "synthfix_bestK_solved": 102,
+  "oracle_solved": 105,
+  "sft_solved_rate": 0.7391304347826086,
+  "synthfix_solved_rate": 0.8869565217391304,
+  "oracle_solved_rate": 0.9130434782608695,
+  "codebleu": {
+    "sft_greedy": 74.78232871203761,
+    "synthfix_bestK": 74.85259622998012
+  },
+  "synthfix_vs_sft_rel_pct": 20.0
+}

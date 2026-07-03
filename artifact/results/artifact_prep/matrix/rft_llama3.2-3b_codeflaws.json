@@ -1,0 +1,33 @@
+{
+  "method": "RFT",
+  "model": "llama3.2-3b",
+  "dataset": "codeflaws",
+  "language": "c",
+  "exact_match": 0.020460358056265986,
+  "codebleu": 0.702791992048883,
+  "total": 391,
+  "em_count": 8,
+  "train_time_s": 3145.1474878787994,
+  "gpu": 0,
+  "peak_gpu_mb": 37446.465024,
+  "config": {
+    "batch_size": 8,
+    "epochs": 2,
+    "lora_rank": 16,
+    "lr": 0.0002,
+    "max_new_tokens": 256,
+    "grad_checkpoint": false,
+    "seed": 42,
+    "init_from_ckpt": null,
+    "rl_beta": null,
+    "rloo_k": null,
+    "rl_temp": null,
+    "rl_top_p": null,
+    "rl_no_repeat_ngram": null,
+    "rerank_margin": 0.015,
+    "num_rerank_cands": 16,
+    "no_rerank": false,
+    "rft_rl_temp": 0.8,
+    "rft_no_repeat_ngram": 0
+  }
+}

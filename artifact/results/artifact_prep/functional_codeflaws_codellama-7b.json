@@ -1,0 +1,29 @@
+{
+  "method": "SynthFix-Functional",
+  "model": "codellama-7b",
+  "dataset": "codeflaws",
+  "n_bugs": 389,
+  "K": 16,
+  "metrics": {
+    "sft_greedy": {
+      "solved_at_1": 0.12853470437017994,
+      "mean_heldout_pass": 0.25342759211653815,
+      "solved_count": 50
+    },
+    "synthfix_greedy": {
+      "solved_at_1": 0.12853470437017994,
+      "mean_heldout_pass": 0.25342759211653815,
+      "solved_count": 50
+    },
+    "synthfix_bestofk": {
+      "solved_at_1": 0.18766066838046272,
+      "mean_heldout_pass": 0.31855184233076267,
+      "solved_count": 73
+    },
+    "synthfix_oracle": {
+      "solved_at_1": 0.2133676092544987,
+      "mean_heldout_pass": 0.33500428449014574,
+      "solved_count": 83
+    }
+  }
+}

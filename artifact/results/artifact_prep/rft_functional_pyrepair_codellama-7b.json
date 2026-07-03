@@ -1,0 +1,18 @@
+{
+  "model": "codellama-7b",
+  "data": "data/benchmarks_processed/pyrepair",
+  "split": "test",
+  "K": 16,
+  "n": 115,
+  "sft_greedy_solved": 87,
+  "synthfix_bestK_solved": 98,
+  "oracle_solved": 102,
+  "sft_solved_rate": 0.7565217391304347,
+  "synthfix_solved_rate": 0.8521739130434782,
+  "oracle_solved_rate": 0.8869565217391304,
+  "codebleu": {
+    "sft_greedy": 75.03177692425605,
+    "synthfix_bestK": 75.22787415711194
+  },
+  "synthfix_vs_sft_rel_pct": 12.643678160919542
+}

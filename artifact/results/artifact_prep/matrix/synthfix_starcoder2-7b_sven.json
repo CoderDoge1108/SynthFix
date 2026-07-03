@@ -1,0 +1,42 @@
+{
+  "method": "SynthFix",
+  "model": "starcoder2-7b",
+  "dataset": "sven",
+  "language": "python",
+  "exact_match": 0.037037037037037035,
+  "codebleu": 0.4821659896960068,
+  "total": 81,
+  "em_count": 3,
+  "train_time_s": 16238.271602392197,
+  "gpu": 0,
+  "peak_gpu_mb": 18227.913216,
+  "config": {
+    "batch_size": 4,
+    "epochs": 4,
+    "lora_rank": 16,
+    "lr": 0.0002,
+    "max_new_tokens": 256,
+    "grad_checkpoint": true,
+    "seed": 42,
+    "init_from_ckpt": null,
+    "rl_beta": 0.12,
+    "rloo_k": 2,
+    "rl_temp": 0.95,
+    "rl_top_p": 0.95,
+    "rl_no_repeat_ngram": 3,
+    "rerank_margin": 0.015,
+    "num_rerank_cands": 16,
+    "no_rerank": false,
+    "rft_rl_temp": 0.8,
+    "rft_no_repeat_ngram": 0
+  },
+  "k_distribution": {
+    "16": 81
+  },
+  "reranker": "lightgbm",
+  "codebleu_greedy": 0.4846497388959002,
+  "codebleu_rerank": 0.4821659896960068,
+  "reranker_delta_pp": -0.24837491998933592,
+  "codebleu_rerank_noid": 0.48201612661945553,
+  "reranker_delta_pp_noid": -0.26336122764446523
+}

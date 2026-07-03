@@ -1,0 +1,12 @@
+{
+  "method": "RFT",
+  "model": "codellama-7b",
+  "dataset": "codeflaws_exec",
+  "language": "c",
+  "codebleu": 0.5792011998208858,
+  "exact_match": 0.058823529411764705,
+  "em_count": 23,
+  "total": 391,
+  "ckpt": "artifact/checkpoints/matrix/synthfix_codellama-7b_codeflaws/checkpoint_epoch2",
+  "note": "standalone greedy codebleu"
+}

@@ -1,0 +1,29 @@
+{
+  "method": "SynthFix-Functional",
+  "model": "deepseek-1.3b",
+  "dataset": "codeflaws",
+  "n_bugs": 389,
+  "K": 16,
+  "metrics": {
+    "sft_greedy": {
+      "solved_at_1": 0.12339331619537275,
+      "mean_heldout_pass": 0.2559982862039417,
+      "solved_count": 48
+    },
+    "synthfix_greedy": {
+      "solved_at_1": 0.11568123393316196,
+      "mean_heldout_pass": 0.22639245929734367,
+      "solved_count": 45
+    },
+    "synthfix_bestofk": {
+      "solved_at_1": 0.15167095115681234,
+      "mean_heldout_pass": 0.28581833761782344,
+      "solved_count": 59
+    },
+    "synthfix_oracle": {
+      "solved_at_1": 0.1928020565552699,
+      "mean_heldout_pass": 0.30205655526992287,
+      "solved_count": 75
+    }
+  }
+}

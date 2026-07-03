@@ -1,0 +1,42 @@
+{
+  "method": "SynthFix",
+  "model": "llama3.2-3b",
+  "dataset": "codeflaws",
+  "language": "c",
+  "exact_match": 0.020460358056265986,
+  "codebleu": 0.7044915356141187,
+  "total": 391,
+  "em_count": 8,
+  "train_time_s": 11546.083644866943,
+  "gpu": 0,
+  "peak_gpu_mb": 31375.134208,
+  "config": {
+    "batch_size": 8,
+    "epochs": 4,
+    "lora_rank": 16,
+    "lr": 0.0002,
+    "max_new_tokens": 256,
+    "grad_checkpoint": false,
+    "seed": 42,
+    "init_from_ckpt": null,
+    "rl_beta": 0.12,
+    "rloo_k": 2,
+    "rl_temp": 0.95,
+    "rl_top_p": 0.95,
+    "rl_no_repeat_ngram": 3,
+    "rerank_margin": 0.015,
+    "num_rerank_cands": 16,
+    "no_rerank": false,
+    "rft_rl_temp": 0.8,
+    "rft_no_repeat_ngram": 0
+  },
+  "k_distribution": {
+    "16": 391
+  },
+  "reranker": "lightgbm",
+  "codebleu_greedy": 0.7057851034393048,
+  "codebleu_rerank": 0.7044915356141187,
+  "reranker_delta_pp": -0.12935678251860816,
+  "codebleu_rerank_noid": 0.7045166901238181,
+  "reranker_delta_pp_noid": -0.12684133154866606
+}
